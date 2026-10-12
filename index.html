@@ -51,28 +51,30 @@
             transform: scale(0.95);
         }
 
+        /* A classe selected agora usa !important para se sobrepor à classe locked 
+           caso uma letra verde seja selecionada para uma nova palavra */
         .cell.selected {
-            background-color: #e0f2fe;
-            border-color: #38bdf8;
-            color: #0284c7;
-            box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+            background-color: #e0f2fe !important;
+            border-color: #38bdf8 !important;
+            color: #0284c7 !important;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.1) !important;
         }
 
+        /* Removido o pointer-events: none para permitir intersecções de palavras */
         .cell.locked {
             background-color: #22c55e;
             border-color: #16a34a;
             color: #ffffff;
-            cursor: default;
             transform: scale(0.95);
             box-shadow: none;
-            pointer-events: none;
         }
 
+        /* A classe error também sobrepõe os estilos base */
         .cell.error {
             animation: shake 0.4s ease-in-out;
-            background-color: #fca5a5;
-            border-color: #ef4444;
-            color: #ffffff;
+            background-color: #fca5a5 !important;
+            border-color: #ef4444 !important;
+            color: #ffffff !important;
         }
 
         @keyframes shake {
@@ -87,12 +89,13 @@
             transition: all 0.3s ease;
         }
         
+        /* Contraste melhorado para palavras já encontradas */
         .word-chip.found {
-            opacity: 0.5;
+            opacity: 0.75;
             text-decoration: line-through;
             background-color: #f1f5f9;
             border-color: #cbd5e1;
-            color: #94a3b8;
+            color: #475569;
         }
 
         ::-webkit-scrollbar {
@@ -162,7 +165,7 @@
 
         <main class="flex-1 flex flex-col items-center p-4 w-full max-w-2xl mx-auto pb-32 overflow-y-auto">
             <!-- Palavras a encontrar -->
-            <div id="wordsList" class="flex flex-wrap justify-center gap-2 mb-6 w-full"></div>
+            <div id="wordsList" class="flex flex-wrap justify-center gap-2 mb-6 w-full px-2"></div>
 
             <!-- Tabuleiro -->
             <div id="gridContainer"></div>
@@ -242,7 +245,7 @@
         </div>
     </div>
 
-    <!-- Modal de Confirmação (Substitui Alerts/Confirms nativos do navegador) -->
+    <!-- Modal de Confirmação (Substitui Alerts/Confirms nativos) -->
     <div id="confirmModal" class="modal-overlay hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[80] flex items-center justify-center p-4">
         <div class="bg-white rounded-3xl p-6 w-full max-w-sm text-center shadow-2xl">
             <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4 text-red-500">
@@ -264,69 +267,18 @@
     </div>
 
     <script>
-        // Progressão focada em alfabetização (V, CV, CVC, CCV)
         const defaultData = {
             modules: [
-                {
-                    id: 1,
-                    name: "1. Vogais (V/VV)",
-                    gridSize: 6,
-                    words: ["OI", "AI", "EU", "UI", "EI"]
-                },
-                {
-                    id: 2,
-                    name: "2. Sílabas Simples (CV)",
-                    gridSize: 6,
-                    words: ["BOLA", "BOLO", "BOCA", "BOTA", "BOI"]
-                },
-                {
-                    id: 3,
-                    name: "3. Animais (CV)",
-                    gridSize: 6,
-                    words: ["GATO", "PATO", "RATO", "SAPO", "VACA"]
-                },
-                {
-                    id: 4,
-                    name: "4. Casa (CV)",
-                    gridSize: 8,
-                    words: ["CAMA", "MESA", "SOFA", "FACA", "COPO"]
-                },
-                {
-                    id: 5,
-                    name: "5. Finais (CVC)",
-                    gridSize: 8,
-                    words: ["MAR", "SOL", "COR", "GOL", "SAL"]
-                },
-                {
-                    id: 6,
-                    name: "6. Mistas (CVC)",
-                    gridSize: 8,
-                    words: ["PORCO", "BARCO", "CORDA", "PORTA", "SORTE"]
-                },
-                {
-                    id: 7,
-                    name: "7. Complexas (CCV)",
-                    gridSize: 8,
-                    words: ["TREM", "PRATO", "BRUXA", "COBRA", "CLIMA"]
-                },
-                {
-                    id: 8,
-                    name: "8. Escola (CCV)",
-                    gridSize: 10,
-                    words: ["LIVRO", "GLOBO", "CLIPE", "PLACA", "BLUSA"]
-                },
-                {
-                    id: 9,
-                    name: "9. Natureza",
-                    gridSize: 10,
-                    words: ["PLANTA", "PEDRA", "TERRA", "VENTO", "NUVEM"]
-                },
-                {
-                    id: 10,
-                    name: "10. Desafio Longo",
-                    gridSize: 10,
-                    words: ["BRINQUEDO", "CACHORRO", "PROFESSOR", "BORBOLETA"]
-                }
+                { id: 1, name: "1. Vogais (V/VV)", gridSize: 6, words: ["OI", "AI", "EU", "UI", "EI"] },
+                { id: 2, name: "2. Sílabas Simples (CV)", gridSize: 6, words: ["BOLA", "BOLO", "BOCA", "BOTA", "BOI"] },
+                { id: 3, name: "3. Animais (CV)", gridSize: 6, words: ["GATO", "PATO", "RATO", "SAPO", "VACA"] },
+                { id: 4, name: "4. Casa (CV)", gridSize: 8, words: ["CAMA", "MESA", "SOFA", "FACA", "COPO"] },
+                { id: 5, name: "5. Finais (CVC)", gridSize: 8, words: ["MAR", "SOL", "COR", "GOL", "SAL"] },
+                { id: 6, name: "6. Mistas (CVC)", gridSize: 8, words: ["PORCO", "BARCO", "CORDA", "PORTA", "SORTE"] },
+                { id: 7, name: "7. Complexas (CCV)", gridSize: 8, words: ["TREM", "PRATO", "BRUXA", "COBRA", "CLIMA"] },
+                { id: 8, name: "8. Escola (CCV)", gridSize: 10, words: ["LIVRO", "GLOBO", "CLIPE", "PLACA", "BLUSA"] },
+                { id: 9, name: "9. Natureza", gridSize: 10, words: ["PLANTA", "PEDRA", "TERRA", "VENTO", "NUVEM"] },
+                { id: 10, name: "10. Desafio Longo", gridSize: 10, words: ["BRINQUEDO", "CACHORRO", "PROFESSOR", "BORBOLETA"] }
             ]
         };
 
@@ -346,8 +298,7 @@
         };
 
         function loadData() {
-            // Chave nova para forçar a atualização dos 10 módulos nesta versão
-            const savedData = localStorage.getItem('cacaPalavrasDataV2');
+            const savedData = localStorage.getItem('cacaPalavrasDataV3');
             if (savedData) {
                 try {
                     appData = JSON.parse(savedData);
@@ -362,7 +313,7 @@
         }
 
         function saveData() {
-            localStorage.setItem('cacaPalavrasDataV2', JSON.stringify(appData));
+            localStorage.setItem('cacaPalavrasDataV3', JSON.stringify(appData));
         }
 
         /* --- MENU --- */
@@ -494,7 +445,7 @@
             }
 
             if (maxWordLen > gridSize) {
-                confirmAction("Atenção", `Há uma palavra com ${maxWordLen} letras. O grid selecionado é ${gridSize}x${gridSize}. Aumente o grid ou diminua a palavra.`, null, false);
+                confirmAction("Atenção", `Há uma palavra com ${maxWordLen} letras. A grelha selecionada é ${gridSize}x${gridSize}. Aumente a grelha ou diminua a palavra.`, null, false);
                 return;
             }
 
@@ -518,7 +469,6 @@
             renderMenu();
         }
 
-        // Sistema de alerta customizado nativo (sem browser alert)
         function confirmAction(title, message, callback, showConfirmButton = true) {
             document.getElementById('confirmTitle').textContent = title;
             document.getElementById('confirmMessage').textContent = message;
@@ -534,7 +484,6 @@
                     closeModal('confirmModal');
                 };
             } else {
-                // Modo Alerta Simples (apenas botão de voltar)
                 actionBtn.classList.add('hidden');
                 cancelBtn.textContent = "Entendi";
             }
@@ -604,11 +553,12 @@
         }
 
         function toggleSelection(cell) {
-            if (isAnimating || cell.classList.contains('locked')) return;
+            // A verificação de '.locked' foi removida para permitir cruzamentos
+            if (isAnimating) return;
             cell.classList.toggle('selected');
         }
 
-        // --- ALGORITMO DE GERAÇÃO DINÂMICA ---
+        /* --- ALGORITMO DE GERAÇÃO DINÂMICA --- */
         function generateGridData(words, size) {
             let grid = null;
             let maxRetries = 15;
@@ -619,7 +569,6 @@
             }
             
             if(!grid) {
-                // Failsafe absoluto
                 grid = Array(size).fill(null).map(() => Array(size).fill('A'));
                 for(let i=0; i<words[0].length; i++) grid[0][i] = words[0][i];
             }
@@ -635,7 +584,6 @@
                 let attempts = 0;
                 
                 while (!placed && attempts < 100) {
-                    // 0 = Horizontal (direita), 1 = Vertical (baixo)
                     let isVertical = Math.random() < 0.5;
                     let r = Math.floor(Math.random() * size);
                     let c = Math.floor(Math.random() * size);
@@ -666,7 +614,6 @@
                 if (!placed) return null;
             }
 
-            // Preencher com letras aleatórias
             const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
             for (let r = 0; r < size; r++) {
                 for (let c = 0; c < size; c++) {
@@ -678,14 +625,13 @@
             return grid;
         }
 
-        // --- VALIDAÇÃO GEOMÉTRICA (LINHA RETA) ---
+        /* --- VALIDAÇÃO GEOMÉTRICA (LINHA RETA) --- */
         function validateSelection() {
             if (isAnimating) return;
 
             const selectedEls = Array.from(document.querySelectorAll('.cell.selected'));
             if (selectedEls.length === 0) return;
 
-            // Ordena geometricamente: linha primeiro, depois coluna
             selectedEls.sort((a, b) => {
                 let rA = parseInt(a.dataset.row), rB = parseInt(b.dataset.row);
                 if (rA === rB) return parseInt(a.dataset.col) - parseInt(b.dataset.col);
@@ -772,7 +718,7 @@
             if (event.target.classList.contains('modal-overlay')) closeModal(id);
         }
 
-        // --- INTEGRAÇÃO KODULAR ---
+        /* --- INTEGRAÇÃO KODULAR --- */
         window.handleAndroidBack = function() {
             if (!document.getElementById('confirmModal').classList.contains('hidden')) {
                 closeModal('confirmModal'); return;
@@ -804,7 +750,9 @@
 
         function registerFakeServiceWorker() {
             if ('serviceWorker' in navigator) {
-                // navigator.serviceWorker.register('sw.js');
+                navigator.serviceWorker.register('sw.js')
+                    .then(() => console.log('Service Worker registado com sucesso.'))
+                    .catch((err) => console.log('Falha ao registar o Service Worker:', err));
             }
         }
     </script>

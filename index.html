@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Caça-Palavras</title>
+    
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#ffffff">
+    <meta name="mobile-web-app-capable" content="yes">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+        }
+
+        /* Tabela do Caça-Palavras */
+        #gridContainer {
+            display: grid;
+            gap: 0.25rem;
+            width: 100%;
+            max-width: 500px;
+            aspect-ratio: 1 / 1;
+            margin: 0 auto;
+        }
+
+        .cell {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            color: #334155;
+            background-color: #ffffff;
+            border: 2px solid #cbd5e1;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            user-select: none;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            text-transform: uppercase;
+            font-size: clamp(1rem, 5vw, 2rem);
+        }
+
+        .cell:active {
+            transform: scale(0.95);
+        }
+
+        .cell.selected {
+            background-color: #e0f2fe;
+            border-color: #38bdf8;
+            color: #0284c7;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .cell.locked {
+            background-color: #22c55e;
+            border-color: #16a34a;
+            color: #ffffff;
+            cursor: default;
+            transform: scale(0.95);
+            box-shadow: none;
+            pointer-events: none;
+        }
+
+        .cell.error {
+            animation: shake 0.4s ease-in-out;
+            background-color: #fca5a5;
+            border-color: #ef4444;
+            color: #ffffff;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20% { transform: translateX(-4px); }
+            40% { transform: translateX(4px); }
+            60% { transform: translateX(-4px); }
+            80% { transform: translateX(4px); }
+        }
+
+        .word-chip {
+            transition: all 0.3s ease;
+        }
+        
+        .word-chip.found {
+            opacity: 0.5;
+            text-decoration: line-through;
+            background-color: #f1f5f9;
+            border-color: #cbd5e1;
+            color: #94a3b8;
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body class="text-slate-800 antialiased h-screen w-screen flex flex-col overflow-hidden">
+
+    <!-- ==================== TELA: MENU DE MÓDULOS ==================== -->
+    <div id="menuScreen" class="flex-1 flex flex-col w-full h-full bg-slate-50">
+        <header class="w-full bg-white shadow-sm px-4 py-4 flex justify-between items-center z-10 shrink-0">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center text-indigo-500">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                        <line x1="3" y1="9" x2="21" y2="9"></line>
+                        <line x1="3" y1="15" x2="21" y2="15"></line>
+                        <line x1="9" y1="3" x2="9" y2="21"></line>
+                        <line x1="15" y1="3" x2="15" y2="21"></line>
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="font-bold text-xl text-slate-800 tracking-tight leading-none">Caça-Palavras</h1>
+                    <span class="text-xs text-slate-400 font-medium uppercase tracking-wider">Módulos</span>
+                </div>
+            </div>
+            
+            <button onclick="openEditModule(-1)" class="w-10 h-10 bg-indigo-500 text-white rounded-xl flex items-center justify-center shadow-md hover:bg-indigo-600 transition-colors active:scale-95" aria-label="Criar Módulo">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+            </button>
+        </header>
+
+        <main class="flex-1 overflow-y-auto p-4 sm:p-6 w-full max-w-3xl mx-auto pb-24">
+            <div id="moduleList" class="flex flex-col gap-4"></div>
+        </main>
+    </div>
+
+    <!-- ==================== TELA: JOGO (GAMEPLAY) ==================== -->
+    <div id="gameScreen" class="hidden flex-1 flex flex-col w-full h-full bg-slate-50 relative">
+        <header class="w-full bg-white shadow-sm px-4 py-3 flex items-center justify-between z-10 shrink-0">
+            <button onclick="showMenu()" class="p-2 -ml-2 rounded-full hover:bg-slate-100 text-slate-500 transition-colors active:scale-95 flex items-center gap-1" aria-label="Voltar">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="19" y1="12" x2="5" y2="12"></line>
+                    <polyline points="12 19 5 12 12 5"></polyline>
+                </svg>
+            </button>
+            <div class="text-center flex-1 pr-6 flex flex-col">
+                <span class="text-xs font-bold text-indigo-500 uppercase tracking-widest" id="moduleIndicator">Módulo</span>
+                <span class="text-sm font-semibold text-slate-600" id="progressIndicator">0/0 Encontradas</span>
+            </div>
+            <button onclick="startLevel()" class="p-2 rounded-full hover:bg-slate-100 text-slate-500 transition-colors active:scale-95" aria-label="Embaralhar">
+                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="23 4 23 10 17 10"></polyline>
+                    <polyline points="1 20 1 14 7 14"></polyline>
+                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                </svg>
+            </button>
+        </header>
+
+        <main class="flex-1 flex flex-col items-center p-4 w-full max-w-2xl mx-auto pb-32 overflow-y-auto">
+            <!-- Palavras a encontrar -->
+            <div id="wordsList" class="flex flex-wrap justify-center gap-2 mb-6 w-full"></div>
+
+            <!-- Tabuleiro -->
+            <div id="gridContainer"></div>
+        </main>
+
+        <div class="absolute bottom-6 left-0 right-0 px-6 flex justify-center pb-safe z-10 pointer-events-none">
+            <button onclick="validateSelection()" class="pointer-events-auto w-full max-w-md bg-indigo-500 hover:bg-indigo-600 text-white font-bold text-lg py-4 px-8 rounded-2xl shadow-lg hover:shadow-xl transition-all active:scale-95 flex items-center justify-center gap-3">
+                <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+                <span>Validar Seleção</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- ==================== MODAIS ==================== -->
+
+    <!-- Modal de Sucesso -->
+    <div id="successModal" class="modal-overlay hidden fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[60] flex items-center justify-center p-4 transition-opacity" onclick="closeSmallModal(event, 'successModal')">
+        <div class="bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl modal-content">
+            <div class="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                    <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                </svg>
+            </div>
+            <h2 class="text-2xl font-bold text-slate-800 mb-2">Muito Bem!</h2>
+            <p class="text-slate-500 mb-8">Você encontrou todas as palavras deste quadro.</p>
+            <button onclick="closeSuccessAndMenu()" class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-4 rounded-xl transition-colors active:scale-95 flex items-center justify-center gap-2 shadow-lg shadow-green-500/30">
+                <span>Voltar ao Menu</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Modal de Edição -->
+    <div id="editModuleModal" class="modal-overlay hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[70] flex items-center justify-center p-4 sm:p-6">
+        <div class="bg-white rounded-3xl w-full max-w-lg h-[90vh] flex flex-col shadow-2xl overflow-hidden relative">
+            <div class="px-6 py-5 border-b border-slate-100 bg-slate-50 shrink-0">
+                <h2 id="editModalTitle" class="font-bold text-xl text-slate-800">Editar Módulo</h2>
+            </div>
+            
+            <div class="flex-1 overflow-y-auto p-6 flex flex-col gap-6">
+                <div>
+                    <label class="block text-sm font-bold text-slate-700 mb-2">Nome do Módulo</label>
+                    <input type="text" id="moduleNameInput" placeholder="Ex: Animais" class="w-full bg-slate-50 border border-slate-200 text-slate-800 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-bold text-slate-700 mb-2">Tamanho do Quadro (Grid)</label>
+                    <select id="gridSizeSelect" class="w-full bg-slate-50 border border-slate-200 text-slate-800 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium appearance-none">
+                        <option value="6">6 x 6 (Fácil)</option>
+                        <option value="8">8 x 8 (Médio)</option>
+                        <option value="10">10 x 10 (Difícil)</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-bold text-slate-700 mb-3">Palavras</label>
+                    <div id="wordEditorList" class="flex flex-col gap-3"></div>
+                    
+                    <button onclick="addWordField()" class="mt-4 w-full border-2 border-dashed border-slate-200 text-slate-500 hover:border-indigo-300 hover:text-indigo-500 hover:bg-indigo-50 font-semibold rounded-xl py-4 transition-colors flex items-center justify-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                        Adicionar Palavra
+                    </button>
+                </div>
+            </div>
+
+            <div class="px-6 py-4 border-t border-slate-100 bg-white flex justify-end gap-3 shrink-0">
+                <button onclick="closeModal('editModuleModal')" class="px-6 py-3 rounded-xl text-slate-600 font-bold hover:bg-slate-100 transition-colors">
+                    Cancelar
+                </button>
+                <button onclick="saveModule()" class="px-6 py-3 bg-indigo-500 text-white rounded-xl font-bold hover:bg-indigo-600 transition-colors shadow-lg shadow-indigo-500/30 flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+                    Salvar Módulo
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Confirmação (Substitui Alerts/Confirms nativos do navegador) -->
+    <div id="confirmModal" class="modal-overlay hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[80] flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl p-6 w-full max-w-sm text-center shadow-2xl">
+            <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4 text-red-500">
+                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 6h18"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+            </div>
+            <h3 class="text-xl font-bold text-slate-800 mb-2" id="confirmTitle">Atenção</h3>
+            <p class="text-slate-500 mb-6 text-sm" id="confirmMessage">Mensagem</p>
+            <div class="flex gap-3" id="confirmButtonsArea">
+                <button onclick="closeModal('confirmModal')" class="flex-1 py-3 rounded-xl text-slate-600 font-bold bg-slate-100 hover:bg-slate-200 transition-colors" id="confirmCancelBtn">
+                    Voltar
+                </button>
+                <button id="confirmActionBtn" class="flex-1 py-3 rounded-xl text-white font-bold bg-red-500 hover:bg-red-600 transition-colors shadow-lg shadow-red-500/30">
+                    Confirmar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Progressão focada em alfabetização (V, CV, CVC, CCV)
+        const defaultData = {
+            modules: [
+                {
+                    id: 1,
+                    name: "1. Vogais (V/VV)",
+                    gridSize: 6,
+                    words: ["OI", "AI", "EU", "UI", "EI"]
+                },
+                {
+                    id: 2,
+                    name: "2. Sílabas Simples (CV)",
+                    gridSize: 6,
+                    words: ["BOLA", "BOLO", "BOCA", "BOTA", "BOI"]
+                },
+                {
+                    id: 3,
+                    name: "3. Animais (CV)",
+                    gridSize: 6,
+                    words: ["GATO", "PATO", "RATO", "SAPO", "VACA"]
+                },
+                {
+                    id: 4,
+                    name: "4. Casa (CV)",
+                    gridSize: 8,
+                    words: ["CAMA", "MESA", "SOFA", "FACA", "COPO"]
+                },
+                {
+                    id: 5,
+                    name: "5. Finais (CVC)",
+                    gridSize: 8,
+                    words: ["MAR", "SOL", "COR", "GOL", "SAL"]
+                },
+                {
+                    id: 6,
+                    name: "6. Mistas (CVC)",
+                    gridSize: 8,
+                    words: ["PORCO", "BARCO", "CORDA", "PORTA", "SORTE"]
+                },
+                {
+                    id: 7,
+                    name: "7. Complexas (CCV)",
+                    gridSize: 8,
+                    words: ["TREM", "PRATO", "BRUXA", "COBRA", "CLIMA"]
+                },
+                {
+                    id: 8,
+                    name: "8. Escola (CCV)",
+                    gridSize: 10,
+                    words: ["LIVRO", "GLOBO", "CLIPE", "PLACA", "BLUSA"]
+                },
+                {
+                    id: 9,
+                    name: "9. Natureza",
+                    gridSize: 10,
+                    words: ["PLANTA", "PEDRA", "TERRA", "VENTO", "NUVEM"]
+                },
+                {
+                    id: 10,
+                    name: "10. Desafio Longo",
+                    gridSize: 10,
+                    words: ["BRINQUEDO", "CACHORRO", "PROFESSOR", "BORBOLETA"]
+                }
+            ]
+        };
+
+        let appData = {};
+        let currentScreen = 'menu';
+        let editingModuleIndex = -1;
+        let currentModuleIndex = 0;
+        
+        let targetWords = [];
+        let foundWords = [];
+        let isAnimating = false;
+
+        window.onload = () => {
+            loadData();
+            renderMenu();
+            registerFakeServiceWorker();
+        };
+
+        function loadData() {
+            // Chave nova para forçar a atualização dos 10 módulos nesta versão
+            const savedData = localStorage.getItem('cacaPalavrasDataV2');
+            if (savedData) {
+                try {
+                    appData = JSON.parse(savedData);
+                } catch (e) {
+                    appData = JSON.parse(JSON.stringify(defaultData));
+                }
+            } else {
+                appData = JSON.parse(JSON.stringify(defaultData));
+                saveData();
+            }
+            if (!appData.modules) appData.modules = [];
+        }
+
+        function saveData() {
+            localStorage.setItem('cacaPalavrasDataV2', JSON.stringify(appData));
+        }
+
+        /* --- MENU --- */
+        function showMenu() {
+            document.getElementById('gameScreen').classList.add('hidden');
+            document.getElementById('menuScreen').classList.remove('hidden');
+            currentScreen = 'menu';
+            renderMenu();
+        }
+
+        function renderMenu() {
+            const list = document.getElementById('moduleList');
+            list.innerHTML = '';
+
+            if (appData.modules.length === 0) {
+                list.innerHTML = `<div class="text-center py-10 text-slate-400 font-medium">Nenhum módulo criado. Clique no + para criar.</div>`;
+                return;
+            }
+
+            appData.modules.forEach((mod, index) => {
+                const card = document.createElement('div');
+                card.className = "bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between";
+                
+                card.innerHTML = `
+                    <div class="flex-1 pr-4">
+                        <h3 class="font-bold text-lg text-slate-800 leading-tight mb-1">${mod.name}</h3>
+                        <span class="text-sm text-slate-400 font-medium flex items-center gap-1">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"></path></svg>
+                            ${mod.words.length} palavras • Grid ${mod.gridSize}x${mod.gridSize}
+                        </span>
+                    </div>
+                    <div class="flex items-center gap-2 shrink-0">
+                        <button onclick="openEditModule(${index})" class="w-12 h-12 bg-slate-50 text-slate-500 hover:text-indigo-500 hover:bg-indigo-50 rounded-xl flex items-center justify-center transition-colors active:scale-95" aria-label="Editar">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+                        </button>
+                        <button onclick="playModule(${index})" class="w-12 h-12 bg-indigo-100 text-indigo-600 hover:bg-indigo-500 hover:text-white rounded-xl flex items-center justify-center transition-colors shadow-sm active:scale-95" aria-label="Jogar">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                        </button>
+                    </div>
+                `;
+                list.appendChild(card);
+            });
+        }
+
+        /* --- EDIÇÃO --- */
+        function openEditModule(index) {
+            editingModuleIndex = index;
+            const title = document.getElementById('editModalTitle');
+            const nameInput = document.getElementById('moduleNameInput');
+            const sizeSelect = document.getElementById('gridSizeSelect');
+            const wordList = document.getElementById('wordEditorList');
+            
+            wordList.innerHTML = '';
+
+            if (index === -1) {
+                title.textContent = "Novo Módulo";
+                nameInput.value = "";
+                sizeSelect.value = "8";
+                addWordField(""); 
+            } else {
+                title.textContent = "Editar Módulo";
+                const mod = appData.modules[index];
+                nameInput.value = mod.name;
+                sizeSelect.value = mod.gridSize || 8;
+                
+                if (mod.words && mod.words.length > 0) {
+                    mod.words.forEach(w => addWordField(w));
+                } else {
+                    addWordField("");
+                }
+
+                const deleteBtnDiv = document.createElement('div');
+                deleteBtnDiv.className = "mt-6 pt-6 border-t border-red-100 delete-area";
+                deleteBtnDiv.innerHTML = `
+                    <button onclick="confirmAction('Excluir Módulo?', 'Esta ação não pode ser desfeita.', () => deleteModule(${index}), true)" class="w-full flex items-center justify-center gap-2 text-red-500 font-bold bg-red-50 py-3 rounded-xl hover:bg-red-100 transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                        Excluir Módulo
+                    </button>
+                `;
+                wordList.appendChild(deleteBtnDiv);
+            }
+            document.getElementById('editModuleModal').classList.remove('hidden');
+        }
+
+        function addWordField(value = "") {
+            const list = document.getElementById('wordEditorList');
+            const div = document.createElement('div');
+            div.className = "flex items-center gap-2 word-row";
+            
+            div.innerHTML = `
+                <input type="text" value="${value}" placeholder="Digite a palavra..." class="flex-1 bg-white border border-slate-200 text-slate-800 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-bold uppercase text-sm" oninput="this.value = this.value.replace(/\\s/g, '').toUpperCase()">
+                <button onclick="this.parentElement.remove()" class="w-12 h-12 shrink-0 bg-slate-50 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl flex items-center justify-center transition-colors" aria-label="Remover">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            `;
+            
+            const deleteDiv = list.querySelector('.delete-area');
+            if (deleteDiv) {
+                list.insertBefore(div, deleteDiv);
+            } else {
+                list.appendChild(div);
+            }
+        }
+
+        function saveModule() {
+            const nameInput = document.getElementById('moduleNameInput').value.trim();
+            const gridSize = parseInt(document.getElementById('gridSizeSelect').value);
+            const inputs = document.querySelectorAll('.word-row input');
+            
+            if (!nameInput) {
+                confirmAction("Atenção", "O nome do módulo não pode estar vazio.", null, false);
+                return;
+            }
+
+            const newWords = [];
+            let maxWordLen = 0;
+
+            inputs.forEach(input => {
+                const val = input.value.trim().toUpperCase();
+                if (val) {
+                    newWords.push(val);
+                    if(val.length > maxWordLen) maxWordLen = val.length;
+                }
+            });
+
+            if (newWords.length === 0) {
+                confirmAction("Atenção", "Adicione pelo menos uma palavra válida.", null, false);
+                return;
+            }
+
+            if (maxWordLen > gridSize) {
+                confirmAction("Atenção", `Há uma palavra com ${maxWordLen} letras. O grid selecionado é ${gridSize}x${gridSize}. Aumente o grid ou diminua a palavra.`, null, false);
+                return;
+            }
+
+            if (editingModuleIndex === -1) {
+                appData.modules.push({ id: Date.now(), name: nameInput, gridSize: gridSize, words: newWords });
+            } else {
+                appData.modules[editingModuleIndex].name = nameInput;
+                appData.modules[editingModuleIndex].gridSize = gridSize;
+                appData.modules[editingModuleIndex].words = newWords;
+            }
+
+            saveData();
+            closeModal('editModuleModal');
+            renderMenu();
+        }
+
+        function deleteModule(index) {
+            appData.modules.splice(index, 1);
+            saveData();
+            closeModal('editModuleModal');
+            renderMenu();
+        }
+
+        // Sistema de alerta customizado nativo (sem browser alert)
+        function confirmAction(title, message, callback, showConfirmButton = true) {
+            document.getElementById('confirmTitle').textContent = title;
+            document.getElementById('confirmMessage').textContent = message;
+            
+            const actionBtn = document.getElementById('confirmActionBtn');
+            const cancelBtn = document.getElementById('confirmCancelBtn');
+
+            if (showConfirmButton) {
+                actionBtn.classList.remove('hidden');
+                cancelBtn.textContent = "Cancelar";
+                actionBtn.onclick = () => {
+                    if (callback) callback();
+                    closeModal('confirmModal');
+                };
+            } else {
+                // Modo Alerta Simples (apenas botão de voltar)
+                actionBtn.classList.add('hidden');
+                cancelBtn.textContent = "Entendi";
+            }
+            
+            document.getElementById('confirmModal').classList.remove('hidden');
+        }
+
+        /* --- GAMEPLAY --- */
+        function playModule(index) {
+            currentModuleIndex = index;
+            currentScreen = 'game';
+            
+            document.getElementById('menuScreen').classList.add('hidden');
+            document.getElementById('gameScreen').classList.remove('hidden');
+            
+            startLevel();
+        }
+
+        function startLevel() {
+            const module = appData.modules[currentModuleIndex];
+            document.getElementById('moduleIndicator').textContent = module.name;
+            
+            targetWords = [...module.words];
+            foundWords = [];
+            updateProgress();
+
+            const gridData = generateGridData(targetWords, module.gridSize);
+            renderGrid(gridData, module.gridSize);
+            renderWordsList();
+        }
+
+        function updateProgress() {
+            document.getElementById('progressIndicator').textContent = `${foundWords.length}/${targetWords.length} Encontradas`;
+        }
+
+        function renderWordsList() {
+            const list = document.getElementById('wordsList');
+            list.innerHTML = '';
+            targetWords.forEach(word => {
+                const chip = document.createElement('div');
+                chip.className = `word-chip px-4 py-2 bg-white border-2 border-indigo-100 rounded-full font-bold text-sm text-indigo-600 shadow-sm uppercase`;
+                chip.dataset.word = word;
+                chip.textContent = word;
+                if(foundWords.includes(word)) {
+                    chip.classList.add('found');
+                }
+                list.appendChild(chip);
+            });
+        }
+
+        function renderGrid(gridData, size) {
+            const container = document.getElementById('gridContainer');
+            container.innerHTML = '';
+            container.style.gridTemplateColumns = `repeat(${size}, minmax(0, 1fr))`;
+
+            for (let r = 0; r < size; r++) {
+                for (let c = 0; c < size; c++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    cell.textContent = gridData[r][c];
+                    cell.dataset.row = r;
+                    cell.dataset.col = c;
+                    cell.onclick = () => toggleSelection(cell);
+                    container.appendChild(cell);
+                }
+            }
+        }
+
+        function toggleSelection(cell) {
+            if (isAnimating || cell.classList.contains('locked')) return;
+            cell.classList.toggle('selected');
+        }
+
+        // --- ALGORITMO DE GERAÇÃO DINÂMICA ---
+        function generateGridData(words, size) {
+            let grid = null;
+            let maxRetries = 15;
+
+            while (!grid && maxRetries > 0) {
+                grid = tryGenerate(words, size);
+                maxRetries--;
+            }
+            
+            if(!grid) {
+                // Failsafe absoluto
+                grid = Array(size).fill(null).map(() => Array(size).fill('A'));
+                for(let i=0; i<words[0].length; i++) grid[0][i] = words[0][i];
+            }
+            return grid;
+        }
+
+        function tryGenerate(words, size) {
+            let grid = Array(size).fill(null).map(() => Array(size).fill(''));
+            let sortedWords = [...words].sort((a, b) => b.length - a.length);
+
+            for (let word of sortedWords) {
+                let placed = false;
+                let attempts = 0;
+                
+                while (!placed && attempts < 100) {
+                    // 0 = Horizontal (direita), 1 = Vertical (baixo)
+                    let isVertical = Math.random() < 0.5;
+                    let r = Math.floor(Math.random() * size);
+                    let c = Math.floor(Math.random() * size);
+
+                    if (isVertical && r + word.length > size) { attempts++; continue; }
+                    if (!isVertical && c + word.length > size) { attempts++; continue; }
+
+                    let canPlace = true;
+                    for (let i = 0; i < word.length; i++) {
+                        let curR = isVertical ? r + i : r;
+                        let curC = isVertical ? c : c + i;
+                        if (grid[curR][curC] !== '' && grid[curR][curC] !== word[i]) {
+                            canPlace = false;
+                            break;
+                        }
+                    }
+
+                    if (canPlace) {
+                        for (let i = 0; i < word.length; i++) {
+                            let curR = isVertical ? r + i : r;
+                            let curC = isVertical ? c : c + i;
+                            grid[curR][curC] = word[i];
+                        }
+                        placed = true;
+                    }
+                    attempts++;
+                }
+                if (!placed) return null;
+            }
+
+            // Preencher com letras aleatórias
+            const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+            for (let r = 0; r < size; r++) {
+                for (let c = 0; c < size; c++) {
+                    if (grid[r][c] === '') {
+                        grid[r][c] = alphabet[Math.floor(Math.random() * alphabet.length)];
+                    }
+                }
+            }
+            return grid;
+        }
+
+        // --- VALIDAÇÃO GEOMÉTRICA (LINHA RETA) ---
+        function validateSelection() {
+            if (isAnimating) return;
+
+            const selectedEls = Array.from(document.querySelectorAll('.cell.selected'));
+            if (selectedEls.length === 0) return;
+
+            // Ordena geometricamente: linha primeiro, depois coluna
+            selectedEls.sort((a, b) => {
+                let rA = parseInt(a.dataset.row), rB = parseInt(b.dataset.row);
+                if (rA === rB) return parseInt(a.dataset.col) - parseInt(b.dataset.col);
+                return rA - rB;
+            });
+
+            let isHorizontal = true, isVertical = true;
+            let fRow = parseInt(selectedEls[0].dataset.row);
+            let fCol = parseInt(selectedEls[0].dataset.col);
+
+            for(let i=0; i<selectedEls.length; i++) {
+                if (parseInt(selectedEls[i].dataset.row) !== fRow || parseInt(selectedEls[i].dataset.col) !== fCol + i) {
+                    isHorizontal = false; break;
+                }
+            }
+
+            if (!isHorizontal) {
+                selectedEls.sort((a, b) => {
+                    let cA = parseInt(a.dataset.col), cB = parseInt(b.dataset.col);
+                    if (cA === cB) return parseInt(a.dataset.row) - parseInt(b.dataset.row);
+                    return cA - cB;
+                });
+                let fC = parseInt(selectedEls[0].dataset.col);
+                let fR = parseInt(selectedEls[0].dataset.row);
+                for(let i=0; i<selectedEls.length; i++) {
+                    if (parseInt(selectedEls[i].dataset.col) !== fC || parseInt(selectedEls[i].dataset.row) !== fR + i) {
+                        isVertical = false; break;
+                    }
+                }
+            }
+
+            if (!isHorizontal && !isVertical) {
+                triggerError(selectedEls);
+                return;
+            }
+
+            let formedWord = selectedEls.map(el => el.textContent).join('');
+
+            if (targetWords.includes(formedWord) && !foundWords.includes(formedWord)) {
+                triggerSuccess(selectedEls, formedWord);
+            } else {
+                triggerError(selectedEls);
+            }
+        }
+
+        function triggerError(elements) {
+            isAnimating = true;
+            elements.forEach(el => {
+                el.classList.remove('selected');
+                el.classList.add('error');
+            });
+            setTimeout(() => {
+                elements.forEach(el => el.classList.remove('error'));
+                isAnimating = false;
+            }, 400);
+        }
+
+        function triggerSuccess(elements, word) {
+            elements.forEach(el => {
+                el.classList.remove('selected');
+                el.classList.add('locked');
+            });
+            foundWords.push(word);
+            updateProgress();
+            renderWordsList();
+
+            if (foundWords.length === targetWords.length) {
+                setTimeout(() => {
+                    document.getElementById('successModal').classList.remove('hidden');
+                }, 400);
+            }
+        }
+
+        function closeSuccessAndMenu() {
+            closeModal('successModal');
+            showMenu();
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.add('hidden');
+        }
+
+        function closeSmallModal(event, id) {
+            if (event.target.classList.contains('modal-overlay')) closeModal(id);
+        }
+
+        // --- INTEGRAÇÃO KODULAR ---
+        window.handleAndroidBack = function() {
+            if (!document.getElementById('confirmModal').classList.contains('hidden')) {
+                closeModal('confirmModal'); return;
+            }
+            if (!document.getElementById('editModuleModal').classList.contains('hidden')) {
+                closeModal('editModuleModal'); return;
+            }
+            if (!document.getElementById('successModal').classList.contains('hidden')) {
+                closeSuccessAndMenu(); return;
+            }
+            if (currentScreen === 'game') {
+                showMenu(); return;
+            }
+            if (window.AppInventor && window.AppInventor.setWebViewString) {
+                window.AppInventor.setWebViewString('VOLTAR_MENU');
+            }
+        };
+
+        window.receberTextoDoKodular = function(texto) {
+            try {
+                const externoData = JSON.parse(texto);
+                if (externoData.modules) {
+                    appData = externoData;
+                    saveData();
+                    if(currentScreen === 'menu') renderMenu();
+                }
+            } catch (e) { }
+        };
+
+        function registerFakeServiceWorker() {
+            if ('serviceWorker' in navigator) {
+                // navigator.serviceWorker.register('sw.js');
+            }
+        }
+    </script>
+</body>
+</html>
